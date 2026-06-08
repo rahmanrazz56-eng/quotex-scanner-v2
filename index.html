@@ -2,122 +2,232 @@
 <html>
 <head>
 <title>Quotex Real Scanner V2</title>
+
 <style>
-body{background:#07172a;color:white;font-family:Arial;text-align:center;padding:30px}
-.card{background:#1e293b;padding:25px;border-radius:18px;max-width:520px;margin:auto}
-.signal{font-size:38px;font-weight:bold}
-.buy{color:#00ff66}.sell{color:#ff4444}.wait{color:#ffd700}
-.small{color:#cbd5e1;font-size:14px}
-button{padding:12px 28px;font-size:18px;border-radius:10px;border:0;cursor:pointer}
+body{
+    background:#07172a;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+    padding:30px;
+}
+
+.card{
+    background:#1e293b;
+    padding:25px;
+    border-radius:18px;
+    max-width:520px;
+    margin:auto;
+}
+
+.signal{
+    font-size:38px;
+    font-weight:bold;
+}
+
+.buy{
+    color:#00ff66;
+}
+
+.sell{
+    color:#ff4444;
+}
+
+.wait{
+    color:#ffd700;
+}
+
+.small{
+    color:#cbd5e1;
+    font-size:14px;
+}
+
+button{
+    padding:12px 28px;
+    font-size:18px;
+    border-radius:10px;
+    border:0;
+    cursor:pointer;
+}
 </style>
+
 </head>
+
 <body>
+
 <div class="card">
+
 <h1>QUOTEX REAL SCANNER V2</h1>
 <h2>EUR/USD - 1 Minute</h2>
-<div id="signal" class="signal wait">WAIT</div>
+
+<div id="signal" class="signal wait">
+WAIT
+</div>
+
 <p id="price">Price: --</p>
-<p id="info" class="small">EMA + RSI + MACD real scan</p>
-<button onclick="scan()">SCAN NOW</button>
-<p class="small">Auto scan every 60 seconds</p>
+
+<p id="info" class="small">
+EMA + RSI + MACD real scan
+</p>
+
+<button onclick="scan()">
+SCAN NOW
+</button>
+
+<p class="small">
+Auto scan every 60 seconds
+</p>
+
 </div>
 
 <script>
+
+// API KEY HERE
 const API_KEY = "c48c777c933744a8a07e31491abffec3";
 
 function ema(values, period){
-  let k = 2 / (period + 1);
-  let e = values[0];
-  for(let i=1;i<values.length;i++) e = values[i]*k + e*(1-k);
-  return e;
+    let k = 2 / (period + 1);
+    let e = values[0];
+
+    for(let i=1;i<values.length;i++){
+        e = values[i] * k + e * (1-k);
+    }
+
+    return e;
 }
 
 function rsi(values, period=14){
-  let gains=0, losses=0;
-  for(let i=values.length-period;i<values.length;i++){
-    let diff = values[i] - values[i-1];
-    if(diff >= 0) gains += diff;
-    else losses -= diff;
-  }
-  if(losses === 0) return 100;
-  let rs = gains / losses;
-  return 100 - (100 / (1 + rs));
+
+    let gains = 0;
+    let losses = 0;
+
+    for(let i=values.length-period;i<values.length;i++){
+
+        let diff = values[i] - values[i-1];
+
+        if(diff >= 0){
+            gains += diff;
+        }else{
+            losses -= diff;
+        }
+    }
+
+    if(losses === 0){
+        return 100;
+    }
+
+    let rs = gains / losses;
+
+    return 100 - (100 / (1 + rs));
 }
 
 function macd(values){
-  let fast = ema(values.slice(-26),12);
-  let slow = ema(values.slice(-26),26);
-  return fast - slow;
+
+    let fast = ema(values.slice(-26),12);
+    let slow = ema(values.slice(-26),26);
+
+    return fast - slow;
 }
 
 async function scan(){
-  const signalEl = document.getElementById("signal");
-  const infoEl = document.getElementById("info");
-  const priceEl = document.getElementById("price");
 
-  signalEl.innerHTML = "SCANNING...";
-  signalEl.className = "signal wait";
+    const signalEl = document.getElementById("signal");
+    const infoEl = document.getElementById("info");
+    const priceEl = document.getElementById("price");
 
-  try{
-    let url = https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1min&outputsize=80&apikey=${API_KEY};
-    let res = await fetch(url);
-    let data = await res.json();
+    signalEl.innerHTML = "SCANNING...";
+    signalEl.className = "signal wait";
 
-    if(data.status === "error" || !data.values){
-      signalEl.innerHTML = "API ERROR";
-      infoEl.innerHTML = data.message || "Check API key / limit";
-      return;
+    try{
+
+        const url =
+        https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1min&outputsize=80&apikey=${API_KEY};
+
+        const res = await fetch(url);
+
+        const data = await res.json();
+
+        if(data.status === "error" || !data.values){
+
+            signalEl.innerHTML = "API ERROR";
+            infoEl.innerHTML = data.message || "Check API key";
+
+            return;
+        }
+
+        const candles = data.values.reverse();
+
+        const closes =
+        candles.map(c => parseFloat(c.close));
+
+        const last =
+        closes[closes.length-1];
+
+        const ema9 =
+        ema(closes.slice(-30),9);
+
+        const ema21 =
+        ema(closes.slice(-40),21);
+
+        const ema50 =
+        ema(closes.slice(-60),50);
+
+        const r =
+        rsi(closes,14);
+
+        const m =
+        macd(closes);
+
+        priceEl.innerHTML =
+        "Price: " + last.toFixed(5);
+
+        const call =
+        last > ema50 &&
+        ema9 > ema21 &&
+        r > 52 &&
+        r < 70 &&
+        m > 0;
+
+        const put =
+        last < ema50 &&
+        ema9 < ema21 &&
+        r < 48 &&
+        r > 30 &&
+        m < 0;
+
+        if(call){
+
+            signalEl.innerHTML = "CALL / BUY";
+            signalEl.className = "signal buy";
+
+        }else if(put){
+
+            signalEl.innerHTML = "PUT / SELL";
+            signalEl.className = "signal sell";
+
+        }else{
+
+            signalEl.innerHTML = "WAIT";
+            signalEl.className = "signal wait";
+        }
+
+        infoEl.innerHTML =
+        EMA9: ${ema9.toFixed(5)} | EMA21: ${ema21.toFixed(5)} | EMA50: ${ema50.toFixed(5)}<br>
+        RSI: ${r.toFixed(2)} | MACD: ${m.toFixed(5)};
+
     }
+    catch(err){
 
-    let candles = data.values.reverse();
-    let closes = candles.map(c => parseFloat(c.close));
-
-    let last = closes[closes.length-1];
-    let ema9 = ema(closes.slice(-30),9);
-    let ema21 = ema(closes.slice(-40),21);
-    let ema50 = ema(closes.slice(-60),50);
-    let r = rsi(closes,14);
-    let m = macd(closes);
-
-    priceEl.innerHTML = "Price: " + last.toFixed(5);
-
-    let call =
-      last > ema50 &&
-      ema9 > ema21 &&
-      r > 52 &&
-      r < 70 &&
-      m > 0;
-
-    let put =
-      last < ema50 &&
-      ema9 < ema21 &&
-      r < 48 &&
-      r > 30 &&
-      m < 0;
-
-    if(call){
-      signalEl.innerHTML = "CALL / BUY";
-      signalEl.className = "signal buy";
-    }else if(put){
-      signalEl.innerHTML = "PUT / SELL";
-      signalEl.className = "signal sell";
-    }else{
-      signalEl.innerHTML = "WAIT";
-      signalEl.className = "signal wait";
+        signalEl.innerHTML = "ERROR";
+        infoEl.innerHTML = err.message;
     }
-
-    infoEl.innerHTML =
-      EMA9: ${ema9.toFixed(5)} | EMA21: ${ema21.toFixed(5)} | EMA50: ${ema50.toFixed(5)}<br> +
-      RSI: ${r.toFixed(2)} | MACD: ${m.toFixed(5)};
-
-  }catch(err){
-    signalEl.innerHTML = "ERROR";
-    infoEl.innerHTML = err.message;
-  }
 }
 
 scan();
-setInterval(scan, 60000);
+
+setInterval(scan,60000);
+
 </script>
+
 </body>
 </html>
