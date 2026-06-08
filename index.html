@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Quotex Scanner V2</title>
+<style>
+body{
+background:#0f172a;
+color:white;
+font-family:Arial;
+text-align:center;
+padding:40px;
+}
+.card{
+background:#1e293b;
+padding:20px;
+border-radius:15px;
+max-width:500px;
+margin:auto;
+}
+.buy{
+color:#00ff66;
+font-size:30px;
+font-weight:bold;
+}
+.sell{
+color:#ff4444;
+font-size:30px;
+font-weight:bold;
+}
+button{
+padding:12px 25px;
+font-size:18px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h1>QUOTEX SCANNER V2</h1>
+<h2>EUR/USD</h2>
+
+<div id="signal" class="buy">BUY</div>
+
+<br>
+
+<button onclick="scanSignal()">SCAN</button>
+</div>
+
+<script>
+function scanSignal(){
+let signals=["BUY","SELL","WAIT"];
+let s=signals[Math.floor(Math.random()*signals.length)];
+
+let el=document.getElementById("signal");
+el.innerHTML=s;
+
+if(s=="BUY"){
+el.className="buy";
+}
+else if(s=="SELL"){
+el.className="sell";
+}
+else{
+el.style.color="yellow";
+}
+}
+</script>
+
+</body>
+</html>
