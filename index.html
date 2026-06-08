@@ -88,8 +88,8 @@ async function scan(){
 
     priceEl.innerHTML = "Price: " + last.toFixed(5);
 
-    var call = last > ema50 && ema9 > ema21 && rr > 52 && rr < 70 && mm > 0;
-    var put = last < ema50 && ema9 < ema21 && rr < 48 && rr > 30 && mm < 0;
+    var call = ema9 > ema21 && rr > 50;
+var put = ema9 < ema21 && rr < 50;
 
     if(call){
       signalEl.innerHTML = "CALL / BUY";
