@@ -165,8 +165,15 @@ document.getElementById("signal").innerHTML=signal;
 }
 
 function clock(){
-  document.getElementById("time").innerHTML=new Date().toLocaleTimeString();
+ 
+
+let t = document.getElementById("time");
+if(t){
+  t.innerHTML = new Date().toLocaleTimeString();
 }
+
+} 
+
 setInterval(clock,1000);
 clock();
 scan();
