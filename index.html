@@ -1,122 +1,176 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Quotex Real Scanner V2</title>
-<style>
-body{background:#07172a;color:white;font-family:Arial;text-align:center;padding:30px}
-.card{background:#1e293b;padding:25px;border-radius:18px;max-width:520px;margin:auto}
-.signal{font-size:38px;font-weight:bold}
-.buy{color:#00ff66}
-.sell{color:#ff4444}
-.wait{color:#ffd700}
-.small{color:#cbd5e1;font-size:14px}
-button{padding:12px 28px;font-size:18px;border-radius:10px;border:0;cursor:pointer}
-</style>
-</head>
-<body>
 
-<div class="card">
-<h1>QUOTEX REAL SCANNER V2</h1>
-<h2>EUR/USD - 1 Minute</h2>
-<div id="signal" class="signal wait">WAIT</div>
-<p id="price">Price: --</p>
-<p id="info" class="small">EMA + RSI + MACD real scan</p>
-<button onclick="scan()">SCAN NOW</button>
-<p class="small">Auto scan every 60 seconds</p>
+<div class="footergrid">
+  <div class="card">
+    <div class="small">SIGNAL SUMMARY</div>
+    <h2 id="summary">-- / 6</h2>
+  </div>
+  <div class="card">
+    <div class="small">SERVER STATUS</div>
+    <h3 class="buy">Connected</h3>
+  </div>
+  <div class="card">
+    <div class="small">LAST UPDATE</div>
+    <h3 id="update">--</h3>
+  </div>
 </div>
 
 <script>
 const API_KEY = "c48c777c933744a8a07e31491abffec3";
 
 function ema(values, period){
-  var k = 2 / (period + 1);
-  var e = values[0];
-  for(var i=1; i<values.length; i++){
-    e = values[i] * k + e * (1-k);
-  }
+  let k = 2 / (period + 1);
+  let e = values[0];
+  for(let i=1;i<values.length;i++) e = values[i]*k + e*(1-k);
   return e;
 }
 
 function rsi(values, period){
-  var gains = 0;
-  var losses = 0;
-  for(var i=values.length-period; i<values.length; i++){
-    var diff = values[i] - values[i-1];
-    if(diff >= 0){ gains += diff; }
-    else{ losses -= diff; }
+  let gains=0, losses=0;
+  for(let i=values.length-period;i<values.length;i++){
+    let diff = values[i] - values[i-1];
+    if(diff>=0) gains += diff;
+    else losses -= diff;
   }
-  if(losses === 0){ return 100; }
-  var rs = gains / losses;
-  return 100 - (100 / (1 + rs));
+  if(losses===0) return 100;
+  let rs = gains/losses;
+  return 100 - (100/(1+rs));
 }
 
 function macd(values){
-  var fast = ema(values.slice(-26), 12);
-  var slow = ema(values.slice(-26), 26);
-  return fast - slow;
+  return ema(values.slice(-40),12) - ema(values.slice(-40),26);
+}
+
+function stochastic(candles){
+  let last = candles[candles.length-1];
+  let recent = candles.slice(-14);
+  let low = Math.min(...recent.map(c=>parseFloat(c.low)));
+  let high = Math.max(...recent.map(c=>parseFloat(c.high)));
+  return ((parseFloat(last.close)-low)/(high-low))*100;
+}
+
+function williams(candles){
+  let last = candles[candles.length-1];
+  let recent = candles.slice(-14);
+  let low = Math.min(...recent.map(c=>parseFloat(c.low)));
+  let high = Math.max(...recent.map(c=>parseFloat(c.high)));
+  return ((high-parseFloat(last.close))/(high-low))*-100;
+}
+
+function drawChart(closes){
+  let c=document.getElementById("chart");
+  let ctx=c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+  let min=Math.min(...closes), max=Math.max(...closes);
+  ctx.beginPath();
+  closes.forEach((v,i)=>{
+    let x=i*(c.width/(closes.length-1));
+    let y=c.height-((v-min)/(max-min))*c.height;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle="#00ff66";
+  ctx.lineWidth=3;
+  ctx.stroke();
 }
 
 async function scan(){
-  var signalEl = document.getElementById("signal");
-  var infoEl = document.getElementById("info");
-  var priceEl = document.getElementById("price");
-
-  signalEl.innerHTML = "SCANNING...";
-  signalEl.className = "signal wait";
-
+  document.getElementById("signal").innerHTML="SCANNING...";
   try{
-    var url = "https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1min&outputsize=80&apikey=" + API_KEY;
+    let url="https://api.twelvedata.com/time_series?symbol=EUR/USD&interval=1min&outputsize=80&apikey="+API_KEY;
+    let res=await fetch(url);
+    let data=await res.json();
 
-    var res = await fetch(url);
-    var data = await res.json();
-
-    if(data.status === "error" || !data.values){
-      signalEl.innerHTML = "API ERROR";
-      infoEl.innerHTML = data.message || "Check API key or limit";
+    if(data.status==="error" || !data.values){
+      document.getElementById("signal").innerHTML="API ERROR";
       return;
     }
 
-    var candles = data.values.reverse();
-    var closes = candles.map(function(c){ return parseFloat(c.close); });
+    let candles=data.values.reverse();
+    let closes=candles.map(c=>parseFloat(c.close));
+    let lastC=candles[candles.length-1];
 
-    var last = closes[closes.length - 1];
-    var ema9 = ema(closes.slice(-30), 9);
-    var ema21 = ema(closes.slice(-40), 21);
-    var ema50 = ema(closes.slice(-60), 50);
-    var rr = rsi(closes, 14);
-    var mm = macd(closes);
+    let last=closes[closes.length-1];
+    let ema9=ema(closes.slice(-30),9);
+    let ema21=ema(closes.slice(-40),21);
+    let ema50=ema(closes.slice(-60),50);
+    let rr=rsi(closes,14);
+    let mm=macd(closes);
+    let st=stochastic(candles);
+    let wr=williams(candles);
 
-    priceEl.innerHTML = "Price: " + last.toFixed(5);
+    let open=parseFloat(lastC.open);
+    let close=parseFloat(lastC.close);
+    let high=parseFloat(lastC.high);
+    let low=parseFloat(lastC.low);
 
-   var call = ema9 > ema21 && ema21 > ema50 && rr > 55 && rr < 75 && mm > 0;
-var put  = ema9 < ema21 && ema21 < ema50 && rr < 45 && rr > 25 && mm < 0;
+    let body=Math.abs(close-open);
+    let range=high-low;
+    let candlePower=range>0 ? (body/range)*100 : 0;
 
-if(call){
-  signalEl.innerHTML = "CALL / BUY";
-  signalEl.className = "signal buy";
-}else if(put){
-  signalEl.innerHTML = "PUT / SELL";
-  signalEl.className = "signal sell";
-}else{
-  signalEl.innerHTML = "WAIT";
-  signalEl.className = "signal wait";
-}
+    let bullish=0, bearish=0;
 
-    infoEl.innerHTML =
-      "EMA9: " + ema9.toFixed(5) +
-      " | EMA21: " + ema21.toFixed(5) +
-      " | EMA50: " + ema50.toFixed(5) +
-      "<br>RSI: " + rr.toFixed(2) +
-      " | MACD: " + mm.toFixed(5);
+    if(ema9>ema21 && ema21>ema50) bullish++; else bearish++;
+    if(rr>55) bullish++; else if(rr<45) bearish++;
+    if(mm>0) bullish++; else bearish++;
+    if(st>55) bullish++; else if(st<45) bearish++;
+    if(wr>-50) bullish++; else bearish++;
+    if(close>open && candlePower>45) bullish++; else if(close<open && candlePower>45) bearish++;
+
+    let confidence=Math.round((Math.max(bullish,bearish)/6)*100);
+    let buyers=Math.round((bullish/6)*100);
+    let sellers=Math.round((bearish/6)*100);
+
+    let signal="WAIT", cls="wait", strength="WEAK / WAIT";
+
+    if(bullish>=5){
+      signal="CALL / BUY ↑";
+      cls="buy";
+      strength=confidence>=80 ? "STRONG SIGNAL" : "BUY SIGNAL";
+    }else if(bearish>=5){
+      signal="PUT / SELL ↓";
+      cls="sell";
+      strength=confidence>=80 ? "STRONG SIGNAL" : "SELL SIGNAL";
+    }
+
+Abdur RahmanSRN12814, [6/9/2026 10:09 PM]
+document.getElementById("signal").innerHTML=signal;
+    document.getElementById("signal").className="signal "+cls;
+    document.getElementById("strength").innerHTML=strength;
+    document.getElementById("confidence").innerHTML=confidence+"%";
+    document.getElementById("price").innerHTML="Price: "+last.toFixed(5);
+
+    document.getElementById("buyers").innerHTML=buyers+"%";
+    document.getElementById("sellers").innerHTML=sellers+"%";
+    document.getElementById("buyBar").style.width=buyers+"%";
+    document.getElementById("sellBar").style.width=sellers+"%";
+
+    document.getElementById("mood").innerHTML = bullish>bearish ? "BULLISH" : bearish>bullish ? "BEARISH" : "WAIT";
+    document.getElementById("mood").className = "mood "+cls;
+    document.getElementById("control").innerHTML = bullish>bearish ? "Buyers in Control" : bearish>bullish ? "Sellers in Control" : "Sideways Market";
+
+    document.getElementById("emaBox").innerHTML = ema9>ema21 ? "Bullish" : "Bearish";
+    document.getElementById("rsiBox").innerHTML = rr.toFixed(2);
+    document.getElementById("macdBox").innerHTML = mm.toFixed(5);
+    document.getElementById("stochBox").innerHTML = st.toFixed(2);
+    document.getElementById("willBox").innerHTML = wr.toFixed(2);
+    document.getElementById("candleBox").innerHTML = Math.round(candlePower)+"%";
+    document.getElementById("summary").innerHTML = Math.max(bullish,bearish)+" / 6";
+    document.getElementById("update").innerHTML = new Date().toLocaleTimeString();
+
+    drawChart(closes.slice(-40));
 
   }catch(err){
-    signalEl.innerHTML = "ERROR";
-    infoEl.innerHTML = err.message;
+    document.getElementById("signal").innerHTML="ERROR";
+    alert(err.message);
   }
 }
 
+function clock(){
+  document.getElementById("time").innerHTML=new Date().toLocaleTimeString();
+}
+setInterval(clock,1000);
+clock();
 scan();
-setInterval(scan, 60000);
+setInterval(scan,60000);
 </script>
 
 </body>
