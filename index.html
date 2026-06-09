@@ -88,19 +88,19 @@ async function scan(){
 
     priceEl.innerHTML = "Price: " + last.toFixed(5);
 
-    var call = ema9 > ema21 && rr > 50;
-var put = ema9 < ema21 && rr < 50;
+   var call = ema9 > ema21 && ema21 > ema50 && rr > 55 && rr < 75 && mm > 0;
+var put  = ema9 < ema21 && ema21 < ema50 && rr < 45 && rr > 25 && mm < 0;
 
-    if(call){
-      signalEl.innerHTML = "CALL / BUY";
-      signalEl.className = "signal buy";
-    }else if(put){
-      signalEl.innerHTML = "PUT / SELL";
-      signalEl.className = "signal sell";
-    }else{
-      signalEl.innerHTML = "WAIT";
-      signalEl.className = "signal wait";
-    }
+if(call){
+  signalEl.innerHTML = "CALL / BUY";
+  signalEl.className = "signal buy";
+}else if(put){
+  signalEl.innerHTML = "PUT / SELL";
+  signalEl.className = "signal sell";
+}else{
+  signalEl.innerHTML = "WAIT";
+  signalEl.className = "signal wait";
+}
 
     infoEl.innerHTML =
       "EMA9: " + ema9.toFixed(5) +
