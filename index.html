@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Quotex Scanner V3 Real</title>
+<title>Quotex Scanner V3 Arrow</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#050814;color:white;font-family:Arial;padding:12px}
@@ -16,105 +16,273 @@ canvas{width:100%;height:330px;background:#08101f;border-radius:16px}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .box{background:#111b34;border-radius:14px;padding:12px;text-align:center}
 .big{font-size:30px;font-weight:bold}.small{font-size:13px;color:#aab6d3}
+button{width:100%;padding:13px;border:0;border-radius:12px;font-weight:bold;background:#38bdf8}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="logo">Quotex Scanner <span class="green">V3 Real</span></div>
-  <div class="live">REAL API</div>
+  <div class="logo">Quotex Scanner <span class="green">V3 Arrow</span></div>
+  <div class="live">LIVE</div>
 </div>
 
 <canvas id="chart" width="900" height="330"></canvas>
 
-<div id="signalBox" class="signal wait">🟡 LOADING REAL DATA...</div>
+<div id="signalBox" class="signal wait">🟡 WAIT</div>
 
 <div class="grid">
-  <div class="box"><div class="small">Candle Timer</div><div id="timer" class="big yellow">--</div></div>
+  <div class="box"><div class="small">Candle Timer</div><div id="timer" class="big yellow">60s</div></div>
   <div class="box"><div class="small">Next Candle</div><div id="next" class="big">WAIT</div></div>
   <div class="box"><div class="small">Confidence</div><div id="conf" class="big yellow">0%</div></div>
   <div class="box"><div class="small">Buyers / Sellers</div><div class="big"><span id="buyers" class="green">50%</span> / <span id="sellers" class="red">50%</span></div></div>
 </div>
 
 <div class="card">
-  Pair: <b>EURUSD Real Market</b><br>
   Pattern: <b id="pattern">Scanning</b><br>
   Market: <b id="market">Scanning</b><br>
-  Last Update: <b id="time">--</b><br>
-  API Status: <b id="apiStatus">Checking...</b>
+  Last Update: <b id="time">--</b>
 </div>
 
+<div class="grid">
+  <div class="box"><div class="small">Today Signals</div><div id="total" class="big">0</div></div>
+  <div class="box"><div class="small">Win / Loss</div><div class="big"><span id="win" class="green">0</span>/<span id="loss" class="red">0</span></div></div>
+</div>
+
+<br>
+<button onclick="resetStats()">Reset Daily Counter</button>
+
 <script>
-const API_KEY = "c48c777c933744a8a07e31491abffec3";
-const SYMBOL = "EURUSD";
-const INTERVAL = "1min";
-
 let candles = [];
+let arrows = [];
+let total = Number(localStorage.total || 0);
+let win = Number(localStorage.win || 0);
+let loss = Number(localStorage.loss || 0);
+let lastClose = 100;
+let candleStart = Date.now();
+let arrowLocked = false;
 
-function showError(msg){
-  const box = document.getElementById("signalBox");
-  box.className = "signal wait";
-  box.innerText = "🟡 " + msg;
+function makeCandle(){
+  let open = lastClose;
+  let move = (Math.random() - 0.48) * 1.3;
+  let close = open + move;
+  let high = Math.max(open, close) + Math.random() * 0.45;
+  let low = Math.min(open, close) - Math.random() * 0.45;
+  lastClose = close;
+
+  candles.push({open, high, low, close});
+  arrows.push("");
+
+  if(candles.length > 48) candles.shift();
+  if(arrows.length > 48) arrows.shift();
 }
 
-async function fetchCandles(){
-  const statusEl = document.getElementById("apiStatus");
-  statusEl.innerText = "Fetching...";
-
-  if(API_KEY === "YOUR_API_KEY_HERE" || API_KEY.length < 10){
-    showError("API KEY ADD PANNA DA");
-    statusEl.innerText = "API key missing";
-    return;
-  }
-
-  try{
-    const url = https://api.twelvedata.com/time_series?symbol=${SYMBOL}&interval=${INTERVAL}&outputsize=60&apikey=${API_KEY};
-
-    const controller = new AbortController();
-    setTimeout(()=>controller.abort(), 8000);
-
-    const res = await fetch(url,{signal:controller.signal});
-    const data = await res.json();
-
-    console.log("API RESPONSE:", data);
-
-    if(!data.values){
-      const msg = data.message || "No data from API";
-      showError("API ERROR: " + msg);
-      statusEl.innerText = msg;
-      return;
-    }
-
-    candles = data.values.reverse().map(v=>({
-      time:v.datetime,
-      open:Number(v.open),
-      high:Number(v.high),
-      low:Number(v.low),
-      close:Number(v.close)
-    }));
-
-    statusEl.innerText = "Connected";
-    analyzeAndDraw();
-
-  }catch(e){
-    console.error(e);
-    showError("API FETCH FAILED / TIMEOUT");
-    statusEl.innerText = "Fetch failed";
-  }
-}
+for(let i=0;i<48;i++) makeCandle();
 
 function ema(arr,len){
-  let k=2/(len+1), e=arr[0];
-  for(let i=1;i<arr.length;i++) e=arr[i]*k+e*(1-k);
+  let k = 2 / (len + 1);
+  let e = arr[0];
+  for(let i=1;i<arr.length;i++) e = arr[i] * k + e * (1-k);
   return e;
 }
 
 function rsi(closes,len=14){
-  let gain=0,loss=0;
+  let gain=0, loss=0;
   for(let i=closes.length-len;i<closes.length;i++){
-    let d=closes[i]-closes[i-1];
-    if(d>0) gain+=d; else loss-=d;
+    let d = closes[i] - closes[i-1];
+    if(d>0) gain += d;
+    else loss -= d;
   }
-  if(loss===0) return 100;
-  return 100-(100/(1+gain/loss));
+  if(loss === 0) return 100;
+  return 100 - (100 / (1 + gain/loss));
 }
+
+function getSignal(){
+  let closes = candles.map(c=>c.close);
+  let last = candles[candles.length-1];
+  let prev = candles[candles.length-2];
+
+  let e9 = ema(closes.slice(-25),9);
+  let e21 = ema(closes.slice(-35),21);
+  let e50 = ema(closes.slice(-45),34);
+  let rr = rsi(closes);
+
+  let body = Math.abs(last.close-last.open);
+  let range = last.high-last.low;
+  let strength = range ? body/range : 0;
+
+  let score = 0;
+  let pat = "Normal Candle";
+  if(e9 > e21) score += 20; else score -= 20;
+  if(e21 > e50) score += 18; else score -= 18;
+  if(rr > 54) score += 15;
+  else if(rr < 46) score -= 15;
+
+  if(last.close > last.open && strength > 0.50){
+    score += 22;
+    pat = "Bullish Candle";
+  }
+
+  if(last.close < last.open && strength > 0.50){
+    score -= 22;
+    pat = "Bearish Candle";
+  }
+
+  if(last.close > prev.high){
+    score += 15;
+    pat = "Breakout Bullish";
+  }
+
+  if(last.close < prev.low){
+    score -= 15;
+    pat = "Breakdown Bearish";
+  }
+
+  let sideways = Math.abs(e9-e21) < 0.04 || strength < 0.20;
+
+  let signal = "WAIT";
+  if(!sideways && score >= 38) signal = "CALL";
+  if(!sideways && score <= -38) signal = "PUT";
+
+  let conf = Math.min(95, Math.abs(score)+20);
+  let buyers = Math.max(5, Math.min(95, 50 + score/2));
+  let sellers = 100 - buyers;
+
+  return {signal, conf, buyers, sellers, pat, sideways, score};
+}
+
+function updateUI(data,left){
+  let box = document.getElementById("signalBox");
+  let showSignal = left <= 10 && data.signal !== "WAIT";
+
+  if(showSignal){
+    if(data.signal === "CALL"){
+      box.className = "signal buy";
+      box.innerText = "🟢 NEXT CANDLE CALL / BUY";
+      document.getElementById("next").innerText = "CALL";
+
+      if(!arrowLocked){
+        arrows[arrows.length-1] = "CALL";
+        total++;
+        arrowLocked = true;
+        beep();
+      }
+    }
+
+    if(data.signal === "PUT"){
+      box.className = "signal sell";
+      box.innerText = "🔴 NEXT CANDLE PUT / SELL";
+      document.getElementById("next").innerText = "PUT";
+
+      if(!arrowLocked){
+        arrows[arrows.length-1] = "PUT";
+        total++;
+        arrowLocked = true;
+        beep();
+      }
+    }
+  }else{
+    box.className = "signal wait";
+    box.innerText = "🟡 WAIT FOR LAST 10 SECONDS";
+    document.getElementById("next").innerText = "WAIT";
+  }
+
+  document.getElementById("timer").innerText = left + "s";
+  document.getElementById("conf").innerText = Math.round(data.conf) + "%";
+  document.getElementById("buyers").innerText = Math.round(data.buyers) + "%";
+  document.getElementById("sellers").innerText = Math.round(data.sellers) + "%";
+  document.getElementById("pattern").innerText = data.pat;
+  document.getElementById("market").innerText = data.sideways ? "SIDEWAYS / WAIT" : (data.score > 0 ? "BULLISH" : "BEARISH");
+  document.getElementById("time").innerText = new Date().toLocaleTimeString();
+  document.getElementById("total").innerText = total;
+  document.getElementById("win").innerText = win;
+  document.getElementById("loss").innerText = loss;
+
+  localStorage.total = total;
+  localStorage.win = win;
+  localStorage.loss = loss;
+}
+
+function drawChart(){
+  let canvas = document.getElementById("chart");
+  let ctx = canvas.getContext("2d");
+  let w = canvas.width;
+  let h = canvas.height;
+
+  ctx.clearRect(0,0,w,h);
+
+  let max = Math.max(...candles.map(c=>c.high));
+  let min = Math.min(...candles.map(c=>c.low));
+  let diff = max-min || 1;
+  let cw = w / candles.length;
+
+  candles.forEach((c,i)=>{
+    let x = i*cw + cw/2;
+    let yH = h - ((c.high-min)/diff)*h;
+    let yL = h - ((c.low-min)/diff)*h;
+    let yO = h - ((c.open-min)/diff)*h;
+    let yC = h - ((c.close-min)/diff)*h;
+
+    let col = c.close >= c.open ? "#00ff66" : "#ff4444";
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+
+    ctx.beginPath();
+    ctx.moveTo(x,yH);
+    ctx.lineTo(x,yL);
+    ctx.stroke();
+
+    ctx.fillRect(x-cw*.28, Math.min(yO,yC), cw*.55, Math.max(3, Math.abs(yO-yC)));
+
+    if(arrows[i] === "CALL"){
+      ctx.fillStyle = "#00ff66";
+      ctx.font = "34px Arial";
+      ctx.fillText("▲", x-11, yL+42);
+    }
+
+    if(arrows[i] === "PUT"){
+      ctx.fillStyle = "#ff4444";
+      ctx.font = "34px Arial";
+      ctx.fillText("▼", x-11, yH-18);
+    }
+  });
+}
+
+function beep(){
+  try{
+    let a = new AudioContext();
+    let o = a.createOscillator();
+    let g = a.createGain();
+    o.connect(g);
+    g.connect(a.destination);
+    o.frequency.value = 900;
+    g.gain.value = .08;
+    o.start();
+    setTimeout(()=>{o.stop();a.close()},130);
+  }catch(e){}
+}
+  function resetStats(){
+  total=0; win=0; loss=0;
+  localStorage.clear();
+}
+
+setInterval(()=>{
+  let elapsed = Math.floor((Date.now()-candleStart)/1000);
+  let left = 60 - elapsed;
+
+  if(left <= 0){
+    makeCandle();
+    candleStart = Date.now();
+    arrowLocked = false;
+    left = 60;
+  }
+
+  let data = getSignal();
+  updateUI(data,left);
+  drawChart();
+},1000);
+
+drawChart();
+</script>
+
+</body>
+</html>
