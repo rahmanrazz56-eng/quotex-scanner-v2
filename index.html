@@ -2,28 +2,32 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Quotex Scanner V3 Real Market</title>
+<title>Quotex Scanner V3 Real</title>
 <style>
+*{box-sizing:border-box}
 body{margin:0;background:#050814;color:white;font-family:Arial;padding:12px}
 .header,.card{background:#0b1224;border:1px solid #1e40af;border-radius:18px;padding:14px;margin-bottom:12px}
-.header{display:flex;justify-content:space-between}.green{color:#00ff66}.red{color:#ff4444}.yellow{color:#ffd43b}
-.live{border:1px solid #00ff66;border-radius:20px;padding:6px 12px;color:#00ff66}
+.header{display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:22px;font-weight:bold}.green{color:#00ff66}.red{color:#ff4444}.yellow{color:#ffd43b}
+.live{border:1px solid #00ff66;border-radius:20px;padding:7px 12px;color:#00ff66}
 canvas{width:100%;height:330px;background:#08101f;border-radius:16px}
 .signal{font-size:32px;font-weight:bold;text-align:center;padding:18px;border-radius:18px;margin:12px 0}
 .buy{background:#064d28;color:#00ff66}.sell{background:#4d0505;color:#ff4444}.wait{background:#4a3b05;color:#ffd43b}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .box{background:#111b34;border-radius:14px;padding:12px;text-align:center}
 .big{font-size:30px;font-weight:bold}.small{font-size:13px;color:#aab6d3}
+.err{color:#ff7777;font-weight:bold}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h2>Quotex Scanner <span class="green">V3 Real</span></h2>
+  <div class="logo">Quotex Scanner <span class="green">V3 Real</span></div>
   <div class="live">REAL API</div>
 </div>
 
 <canvas id="chart" width="900" height="330"></canvas>
+
 <div id="signalBox" class="signal wait">🟡 LOADING REAL DATA...</div>
 
 <div class="grid">
@@ -37,159 +41,87 @@ canvas{width:100%;height:330px;background:#08101f;border-radius:16px}
   Pair: <b>EUR/USD Real Market</b><br>
   Pattern: <b id="pattern">Scanning</b><br>
   Market: <b id="market">Scanning</b><br>
-  Last Update: <b id="time">--</b>
+  Last Update: <b id="time">--</b><br>
+  API Status: <b id="apiStatus">Checking...</b>
 </div>
 
 <script>
-const API_KEY = "c48c777c933744a8a07e31491abffec3";
+const API_KEY =
+  "c48c777c933744a8a07e31491abffec3";
 const SYMBOL = "EUR/USD";
 const INTERVAL = "1min";
 
 let candles = [];
-let arrows = [];
+let lastSignal = "WAIT";
 
 async function fetchCandles(){
-  try{
-    let url=https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(SYMBOL)}&interval=${INTERVAL}&outputsize=60&apikey=${API_KEY};
-    let res=await fetch(url);
-    let data=await res.json();
+  const statusEl = document.getElementById("apiStatus");
 
-    if(data.status==="error" || !data.values){
-      document.getElementById("signalBox").className="signal wait";
-      document.getElementById("signalBox").innerText="API ERROR: CHECK API KEY";
+  if(API_KEY === "YOUR_API_KEY_HERE" || API_KEY.length < 10){
+    showError("API KEY ADD PANNA DA");
+    statusEl.innerText = "API key missing";
+    return;
+  }
+
+  try{
+    const url = "https://api.twelvedata.com/time_series?symbol=" +
+      encodeURIComponent(SYMBOL) +
+      "&interval=" + INTERVAL +
+      "&outputsize=60&apikey=" + API_KEY;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    console.log("TwelveData Response:", data);
+
+    if(data.status === "error" || !data.values){
+      let msg = data.message ? data.message : "No candle data";
+      showError("API ERROR: " + msg);
+      statusEl.innerText = msg;
       return;
     }
 
-    candles=data.values.reverse().map(v=>({
-      time:v.datetime,
-      open:parseFloat(v.open),
-      high:parseFloat(v.high),
-      low:parseFloat(v.low),
-      close:parseFloat(v.close)
+    candles = data.values.reverse().map(v => ({
+      time: v.datetime,
+      open: Number(v.open),
+      high: Number(v.high),
+      low: Number(v.low),
+      close: Number(v.close)
     }));
 
+    statusEl.innerText = "Connected";
     analyzeAndDraw();
 
-  }catch(e){
-    document.getElementById("signalBox").innerText="NETWORK / API ERROR";
+  }catch(err){
+    console.error(err);
+    showError("NETWORK ERROR / API BLOCK");
+    statusEl.innerText = "Network error";
   }
+}
+
+function showError(msg){
+  const box = document.getElementById("signalBox");
+  box.className = "signal wait";
+  box.innerText = "🟡 " + msg;
 }
 
 function ema(arr,len){
-  let k=2/(len+1), e=arr[0];
-  for(let v of arr)e=v*k+e*(1-k);
+  let k = 2 / (len + 1);
+  let e = arr[0];
+  for(let i=1;i<arr.length;i++){
+    e = arr[i] * k + e * (1 - k);
+  }
   return e;
 }
 
-function rsi(closes,len=14){
-  let gain=0,loss=0;
-  for(let i=closes.length-len;i<closes.length;i++){
-    let d=closes[i]-closes[i-1];
-    if(d>0)gain+=d; else loss-=d;
+function rsi(closes,len){
+  let gain = 0;
+  let loss = 0;
+  for(let i = closes.length - len; i < closes.length; i++){
+    let d = closes[i] - closes[i-1];
+    if(d > 0) gain += d;
+    else loss -= d;
   }
-  if(loss===0)return 100;
-  return 100-(100/(1+gain/loss));
+  if(loss === 0) return 100;
+  return 100 - (100 / (1 + gain / loss));
 }
-
-function getSignal(){
-  let c=candles, closes=c.map(x=>x.close);
-  let last=c[c.length-1], prev=c[c.length-2];
-
-  let e9=ema(closes.slice(-25),9);
-  let e21=ema(closes.slice(-30),21);
-  let e50=ema(closes.slice(-55),50);
-  let rr=rsi(closes);
-
-  let body=Math.abs(last.close-last.open);
-  let range=last.high-last.low;
-  let strength=range?body/range:0;
-
-  let score=0, pat="Normal Candle";
-
-  if(e9>e21)score+=20; else score-=20;
-  if(e21>e50)score+=20; else score-=20;
-  if(rr>54)score+=15; else if(rr<46)score-=15;
-
-  if(last.close>last.open && strength>0.50){score+=20;pat="Bullish Candle"}
-  if(last.close<last.open && strength>0.50){score-=20;pat="Bearish Candle"}
-
-  if(last.close>prev.high){score+=15;pat="Breakout Bullish"}
-  if(last.close<prev.low){score-=15;pat="Breakdown Bearish"}
-  let sideways = Math.abs(e9-e21) < 0.00003 || strength < 0.20;
-  let signal="WAIT";
-
-  if(sideways) signal="WAIT";
-  else if(score>=38) signal="CALL";
-  else if(score<=-38) signal="PUT";
-
-  let conf=Math.min(95,Math.abs(score)+20);
-  let buyers=Math.max(5,Math.min(95,50+score/2));
-  let sellers=100-buyers;
-
-  return {signal,conf,buyers,sellers,pat,sideways,score};
-}
-
-function analyzeAndDraw(){
-  let d=getSignal();
-  let sec=new Date().getSeconds();
-  let left=60-sec;
-
-  let showSignal = left <= 10 && d.signal !== "WAIT";
-  let box=document.getElementById("signalBox");
-
-  if(showSignal){
-    box.className="signal "+(d.signal==="CALL"?"buy":"sell");
-    box.innerText=d.signal==="CALL" ? "🟢 NEXT CANDLE CALL / BUY" : "🔴 NEXT CANDLE PUT / SELL";
-    document.getElementById("next").innerText=d.signal;
-  }else{
-    box.className="signal wait";
-    box.innerText="🟡 WAIT FOR LAST 10 SECONDS";
-    document.getElementById("next").innerText="WAIT";
-  }
-
-  document.getElementById("timer").innerText=left+"s";
-  document.getElementById("conf").innerText=Math.round(d.conf)+"%";
-  document.getElementById("buyers").innerText=Math.round(d.buyers)+"%";
-  document.getElementById("sellers").innerText=Math.round(d.sellers)+"%";
-  document.getElementById("pattern").innerText=d.pat;
-  document.getElementById("market").innerText=d.sideways ? "SIDEWAYS / WAIT" : (d.score>0?"BULLISH":"BEARISH");
-  document.getElementById("time").innerText=new Date().toLocaleTimeString();
-
-  drawChart(d.signal);
-}
-
-function drawChart(sig){
-  let ctx=chart.getContext("2d"), w=chart.width,h=chart.height;
-  ctx.clearRect(0,0,w,h);
-
-  let max=Math.max(...candles.map(c=>c.high));
-  let min=Math.min(...candles.map(c=>c.low));
-  let cw=w/candles.length;
-
-  candles.forEach((c,i)=>{
-    let x=i*cw+cw/2;
-    let yH=h-(c.high-min)/(max-min)*h;
-    let yL=h-(c.low-min)/(max-min)*h;
-    let yO=h-(c.open-min)/(max-min)*h;
-    let yC=h-(c.close-min)/(max-min)*h;
-    let col=c.close>=c.open?"#00ff66":"#ff4444";
-
-    ctx.strokeStyle=col; ctx.fillStyle=col;
-    ctx.beginPath(); ctx.moveTo(x,yH); ctx.lineTo(x,yL); ctx.stroke();
-    ctx.fillRect(x-cw*.28,Math.min(yO,yC),cw*.55,Math.max(3,Math.abs(yO-yC)));
-
-    if(i===candles.length-1 && sig==="CALL"){
-      ctx.fillStyle="#00ff66"; ctx.font="28px Arial"; ctx.fillText("▲",x-10,yL+30);
-    }
-    if(i===candles.length-1 && sig==="PUT"){
-      ctx.fillStyle="#ff4444"; ctx.font="28px Arial"; ctx.fillText("▼",x-10,yH-10);
-    }
-  });
-}
-
-fetchCandles();
-setInterval(fetchCandles,15000);
-setInterval(()=>{ if(candles.length>20) analyzeAndDraw(); },1000);
-</script>
-</body>
-</html>
