@@ -1,39 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Quotex Real Scanner V3 - V2 Logic</title>
+<title>Quotex Real Scanner V4 - Next Candle</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#050b18;color:white;font-family:Arial;padding:15px}
 .header{display:flex;justify-content:space-between;align-items:center;background:#0b1328;padding:15px;border-radius:18px;border:1px solid #1e3a8a}
-.logo{font-size:22px;font-weight:bold}.v3{color:#00ff66}.live{color:#00ff66;border:1px solid #00ff66;padding:8px 14px;border-radius:20px}
+.logo{font-size:20px;font-weight:bold}.v3{color:#00ff66}.live{color:#00ff66;border:1px solid #00ff66;padding:8px 14px;border-radius:20px}
 .grid,.footergrid{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:15px;margin-top:15px}
 .card{background:#0b1328;border:1px solid #1e3a8a;border-radius:18px;padding:18px;box-shadow:0 0 20px #001f4d}
-.signal{font-size:36px;font-weight:bold;margin:15px 0}.buy{color:#00ff66}.sell{color:#ff3344}.wait{color:#ffd43b}
+.signal{font-size:34px;font-weight:bold;margin:15px 0}.buy{color:#00ff66}.sell{color:#ff3344}.wait{color:#ffd43b}
 .badge{display:inline-block;padding:8px 14px;border-radius:10px;background:#111b33;color:#ffd43b;font-weight:bold}
-.circle{width:150px;height:150px;border-radius:50%;border:16px solid #ffd43b;display:flex;align-items:center;justify-content:center;margin:20px auto;font-size:32px;font-weight:bold}
-canvas{width:100%;height:260px;background:#071225;border-radius:15px}
-.mood{font-size:28px;font-weight:bold;margin-top:20px}
-.bar{height:12px;background:#1f2937;border-radius:20px;overflow:hidden;margin-top:8px}.fillBuy{height:100%;background:#00ff66}.fillSell{height:100%;background:#ff3344}
+.circle{width:140px;height:140px;border-radius:50%;border:16px solid #ffd43b;display:flex;align-items:center;justify-content:center;margin:20px auto;font-size:30px;font-weight:bold}
+canvas{width:100%;height:300px;background:#071225;border-radius:15px}
+.mood{font-size:26px;font-weight:bold;margin-top:20px}
+.bar{height:12px;background:#1f2937;border-radius:20px;overflow:hidden;margin-top:8px}
+.fillBuy{height:100%;background:#00ff66}.fillSell{height:100%;background:#ff3344}
 .indicators{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:15px}
-.ind{background:#111b33;border:1px solid #243b73;border-radius:14px;padding:14px}.ind h4{margin:0;color:#cbd5e1}.ind .val{font-size:22px;margin-top:8px}
-.small{color:#cbd5e1;font-size:14px}button{background:#2563eb;color:white;border:0;padding:12px 25px;border-radius:12px;font-size:16px}
+.ind{background:#111b33;border:1px solid #243b73;border-radius:14px;padding:14px}
+.ind h4{margin:0;color:#cbd5e1}.ind .val{font-size:22px;margin-top:8px}
+.small{color:#cbd5e1;font-size:14px}
+button{background:#2563eb;color:white;border:0;padding:12px 25px;border-radius:12px;font-size:16px}
 @media(max-width:900px){.grid,.footergrid,.indicators{grid-template-columns:1fr}}
 </style>
 </head>
+
 <body>
 
 <div class="header">
-  <div class="logo">QUOTEX REAL SCANNER <span class="v3">V3</span> + V2 LOGIC</div>
+  <div class="logo">QUOTEX REAL SCANNER <span class="v3">V4 NEXT CANDLE</span></div>
   <div><span id="time">--</span> <span class="live">● LIVE</span></div>
 </div>
 
 <div class="grid">
   <div class="card">
-    <div class="small">CURRENT SIGNAL</div>
+    <div class="small">NEXT 1 MINUTE CANDLE SIGNAL</div>
     <div id="signal" class="signal wait">WAIT</div>
-    <div id="strength" class="badge">V2 SAFE LOGIC</div>
+    <div id="strength" class="badge">NEXT CANDLE LOGIC</div>
     <div class="circle" id="circle"><span id="confidence">--%</span></div>
     <p>Asset: <b>EUR/USD</b></p>
     <p>Timeframe: <b>1 Minute</b></p>
@@ -41,8 +45,8 @@ canvas{width:100%;height:260px;background:#071225;border-radius:15px}
   </div>
 
   <div class="card">
-    <div class="small">EUR/USD - 1 MINUTE CHART</div>
-    <canvas id="chart" width="600" height="260"></canvas>
+    <div class="small">EUR/USD - 1 MINUTE CANDLE CHART</div>
+    <canvas id="chart" width="700" height="300"></canvas>
     <p id="price">Price: --</p>
   </div>
 
@@ -58,10 +62,10 @@ canvas{width:100%;height:260px;background:#071225;border-radius:15px}
 </div>
 
 <div class="card" style="margin-top:15px">
-  <div class="small">V2 INDICATORS</div>
+  <div class="small">INDICATORS</div>
   <div class="indicators">
     <div class="ind"><h4>EMA Trend</h4><div id="emaBox" class="val">--</div></div>
-    <div class="ind"><h4>RSI (14)</h4><div id="rsiBox" class="val">--</div></div>
+    <div class="ind"><h4>RSI</h4><div id="rsiBox" class="val">--</div></div>
     <div class="ind"><h4>MACD</h4><div id="macdBox" class="val">--</div></div>
     <div class="ind"><h4>EMA 9</h4><div id="ema9Box" class="val">--</div></div>
     <div class="ind"><h4>EMA 21</h4><div id="ema21Box" class="val">--</div></div>
@@ -70,16 +74,16 @@ canvas{width:100%;height:260px;background:#071225;border-radius:15px}
 </div>
 
 <div class="footergrid">
-  <div class="card"><div class="small">SIGNAL SUMMARY</div><h2 id="summary">V2 Safe Filter</h2></div>
+  <div class="card"><div class="small">SIGNAL SUMMARY</div><h2 id="summary">Waiting</h2></div>
   <div class="card"><div class="small">SERVER STATUS</div><h3 class="buy">Connected</h3></div>
   <div class="card"><div class="small">LAST UPDATE</div><h3 id="update">--</h3></div>
 </div>
-
 <script>
-const API_KEY = "c48c777c933744a8a07e31491abffec3";
-  function ema(values, period){
+const API_KEY = "";
+
+function ema(values, period){
   let k = 2 / (period + 1);
-  let e = values[0];
+  let e = values[0];c48c777c933744a8a07e31491abffec3
   for(let i=1; i<values.length; i++){
     e = values[i] * k + e * (1-k);
   }
@@ -87,43 +91,80 @@ const API_KEY = "c48c777c933744a8a07e31491abffec3";
 }
 
 function rsi(values, period){
-  let gains = 0;
-  let losses = 0;
+  let gains = 0, losses = 0;
   for(let i=values.length-period; i<values.length; i++){
     let diff = values[i] - values[i-1];
-    if(diff >= 0){ gains += diff; }
-    else{ losses -= diff; }
+    if(diff >= 0) gains += diff;
+    else losses -= diff;
   }
-  if(losses === 0){ return 100; }
+  if(losses === 0) return 100;
   let rs = gains / losses;
   return 100 - (100 / (1 + rs));
 }
 
 function macd(values){
-  let fast = ema(values.slice(-40), 12);
-  let slow = ema(values.slice(-40), 26);
-  return fast - slow;
+  return ema(values.slice(-40),12) - ema(values.slice(-40),26);
 }
 
-function drawChart(closes){
+function drawCandles(candles, signal){
   let c = document.getElementById("chart");
   let ctx = c.getContext("2d");
   ctx.clearRect(0,0,c.width,c.height);
 
-  let min = Math.min(...closes);
-  let max = Math.max(...closes);
-  if(max === min) return;
+  let data = candles.slice(-35);
+  let highs = data.map(x=>parseFloat(x.high));
+  let lows = data.map(x=>parseFloat(x.low));
+  let max = Math.max(...highs);
+  let min = Math.min(...lows);
+  let range = max - min;
+  if(range === 0) return;
 
-  ctx.beginPath();
-  closes.forEach((v,i)=>{
-    let x = i * (c.width / (closes.length - 1));
-    let y = c.height - ((v - min) / (max - min)) * c.height;
-    if(i === 0) ctx.moveTo(x,y);
-    else ctx.lineTo(x,y);
+  let w = c.width / data.length;
+  let lastX = 0, lastY = 0;
+
+  data.forEach((x,i)=>{
+    let open = parseFloat(x.open);
+    let high = parseFloat(x.high);
+    let low = parseFloat(x.low);
+    let close = parseFloat(x.close);
+
+    let cx = i*w + w/2;
+    let yHigh = c.height - ((high-min)/range)*c.height;
+    let yLow = c.height - ((low-min)/range)*c.height;
+    let yOpen = c.height - ((open-min)/range)*c.height;
+    let yClose = c.height - ((close-min)/range)*c.height;
+
+    let green = close >= open;
+    ctx.strokeStyle = green ? "#00ff66" : "#ff3344";
+    ctx.fillStyle = green ? "#00ff66" : "#ff3344";
+
+    ctx.beginPath();
+    ctx.moveTo(cx,yHigh);
+    ctx.lineTo(cx,yLow);
+    ctx.stroke();
+
+    let bodyTop = Math.min(yOpen,yClose);
+    let bodyH = Math.abs(yOpen-yClose);
+    if(bodyH < 2) bodyH = 2;
+    ctx.fillRect(cx-w*0.28, bodyTop, w*0.56, bodyH);
+
+    if(i === data.length-1){
+      lastX = cx;
+      lastY = close >= open ? yLow : yHigh;
+    }
   });
-  ctx.strokeStyle = "#00ff66";
-  ctx.lineWidth = 3;
-  ctx.stroke();
+
+  if(signal === "CALL"){
+    ctx.fillStyle = "#00ff66";
+    ctx.font = "28px Arial";
+    ctx.fillText("↑ CALL", lastX-38, lastY+35);
+  }
+
+  if(signal === "PUT"){
+    ctx.fillStyle = "#ff3344";
+    ctx.font = "28px Arial";
+    ctx.fillText("↓ PUT", lastX-35, lastY-15);
+  }
 }
 
 async function scan(){
@@ -145,80 +186,107 @@ async function scan(){
     let candles = data.values.reverse();
     let closes = candles.map(c => parseFloat(c.close));
 
-    let last = closes[closes.length - 1];
-    let ema9 = ema(closes.slice(-30), 9);
-    let ema21 = ema(closes.slice(-40), 21);
-    let ema50 = ema(closes.slice(-60), 50);
-    let rr = rsi(closes, 14);
+    let lastCandle = candles[candles.length-1];
+    let prevCandle = candles[candles.length-2];
+
+    let last = parseFloat(lastCandle.close);
+    let open = parseFloat(lastCandle.open);
+    let high = parseFloat(lastCandle.high);
+    let low = parseFloat(lastCandle.low);
+
+    let ema9 = ema(closes.slice(-30),9);
+    let ema21 = ema(closes.slice(-40),21);
+    let ema50 = ema(closes.slice(-60),50);
+    let rr = rsi(closes,14);
     let mm = macd(closes);
 
-    let call = ema9 > ema21 &&
-               ema21 > ema50 &&
-               rr > 55 &&
-               rr < 75 &&
-               mm > 0;
+    let body = Math.abs(last-open);
+    let candleRange = high-low;
+    let strengthCandle = candleRange === 0 ? 0 : (body/candleRange)*100;
 
-    let put = ema9 < ema21 &&
-              ema21 < ema50 &&
-              rr < 45 &&
-              rr > 25 &&
-              mm < 0;
+    let bullishCandle = last > open;
+    let bearishCandle = last < open;
+
+    let trendBull = ema9 > ema21 && ema21 > ema50;
+    let trendBear = ema9 < ema21 && ema21 < ema50;
+
+    let momentumUp = closes[closes.length-1] > closes[closes.length-2];
+    let momentumDown = closes[closes.length-1] < closes[closes.length-2];
+
+    let callScore = 0;
+    let putScore = 0;
+
+    if(trendBull) callScore += 25;
+    if(trendBear) putScore += 25;
+
+    if(rr > 52 && rr < 72) callScore += 20;
+    if(rr < 48 && rr > 28) putScore += 20;
+    if(mm > 0) callScore += 20;
+    if(mm < 0) putScore += 20;
+
+    if(bullishCandle && strengthCandle > 45) callScore += 20;
+    if(bearishCandle && strengthCandle > 45) putScore += 20;
+
+    if(momentumUp) callScore += 15;
+    if(momentumDown) putScore += 15;
 
     let signal = "WAIT";
+    let chartSignal = "WAIT";
     let cls = "wait";
-    let strength = "WAIT - NO CLEAR SETUP";
     let confidence = 50;
     let buyers = 50;
     let sellers = 50;
+    let strength = "WAIT - SIDEWAYS / WEAK";
     let borderColor = "#ffd43b";
 
-    if(call){
-      signal = "CALL / BUY ↑";
+    if(callScore >= 70 && callScore > putScore + 15){
+      signal = "CALL ↑";
+      chartSignal = "CALL";
       cls = "buy";
-      strength = "V2 STRONG BUY";
-      confidence = 85;
-      buyers = 75;
-      sellers = 25;
+      confidence = Math.min(callScore,95);
+      buyers = confidence;
+      sellers = 100-confidence;
+      strength = "NEXT CANDLE UP";
       borderColor = "#00ff66";
     }
-    else if(put){
-      signal = "PUT / SELL ↓";
+    else if(putScore >= 70 && putScore > callScore + 15){
+      signal = "PUT ↓";
+      chartSignal = "PUT";
       cls = "sell";
-      strength = "V2 STRONG SELL";
-      confidence = 85;
-      buyers = 25;
-      sellers = 75;
+      confidence = Math.min(putScore,95);
+      sellers = confidence;
+      buyers = 100-confidence;
+      strength = "NEXT CANDLE DOWN";
       borderColor = "#ff3344";
     }
 
     signalEl.innerHTML = signal;
     signalEl.className = "signal " + cls;
-
     document.getElementById("strength").innerHTML = strength;
     document.getElementById("confidence").innerHTML = confidence + "%";
     document.getElementById("circle").style.borderColor = borderColor;
 
     document.getElementById("price").innerHTML = "Price: " + last.toFixed(5);
-
     document.getElementById("buyers").innerHTML = buyers + "%";
     document.getElementById("sellers").innerHTML = sellers + "%";
     document.getElementById("buyBar").style.width = buyers + "%";
     document.getElementById("sellBar").style.width = sellers + "%";
 
-    document.getElementById("mood").innerHTML = call ? "BULLISH" : put ? "BEARISH" : "WAIT";
+    document.getElementById("mood").innerHTML = chartSignal === "CALL" ? "BULLISH" : chartSignal === "PUT" ? "BEARISH" : "WAIT";
     document.getElementById("mood").className = "mood " + cls;
-    document.getElementById("control").innerHTML = call ? "Buyers in Control" : put ? "Sellers in Control" : "Sideways / Mixed Market";
-    document.getElementById("emaBox").innerHTML = ema9 > ema21 && ema21 > ema50 ? "Bullish" : ema9 < ema21 && ema21 < ema50 ? "Bearish" : "Mixed";
+    document.getElementById("control").innerHTML = chartSignal === "CALL" ? "Buyers Control" : chartSignal === "PUT" ? "Sellers Control" : "Sideways / No Trade";
+
+    document.getElementById("emaBox").innerHTML = trendBull ? "Bullish" : trendBear ? "Bearish" : "Mixed";
     document.getElementById("rsiBox").innerHTML = rr.toFixed(2);
     document.getElementById("macdBox").innerHTML = mm.toFixed(5);
     document.getElementById("ema9Box").innerHTML = ema9.toFixed(5);
     document.getElementById("ema21Box").innerHTML = ema21.toFixed(5);
     document.getElementById("ema50Box").innerHTML = ema50.toFixed(5);
 
-    document.getElementById("summary").innerHTML = call ? "EMA + RSI + MACD BUY" : put ? "EMA + RSI + MACD SELL" : "WAIT";
+    document.getElementById("summary").innerHTML = strength;
     document.getElementById("update").innerHTML = new Date().toLocaleTimeString();
 
-    drawChart(closes.slice(-40));
+    drawCandles(candles, chartSignal);
 
   }catch(err){
     signalEl.innerHTML = "ERROR";
