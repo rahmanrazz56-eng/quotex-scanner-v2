@@ -16,7 +16,6 @@ canvas{width:100%;height:330px;background:#08101f;border-radius:16px}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .box{background:#111b34;border-radius:14px;padding:12px;text-align:center}
 .big{font-size:30px;font-weight:bold}.small{font-size:13px;color:#aab6d3}
-.err{color:#ff7777;font-weight:bold}
 </style>
 </head>
 <body>
@@ -38,7 +37,7 @@ canvas{width:100%;height:330px;background:#08101f;border-radius:16px}
 </div>
 
 <div class="card">
-  Pair: <b>EUR/USD Real Market</b><br>
+  Pair: <b>EURUSD Real Market</b><br>
   Pattern: <b id="pattern">Scanning</b><br>
   Market: <b id="market">Scanning</b><br>
   Last Update: <b id="time">--</b><br>
@@ -46,16 +45,21 @@ canvas{width:100%;height:330px;background:#08101f;border-radius:16px}
 </div>
 
 <script>
-const API_KEY =c48c777c933744a8a07e31491abffec3
-  
+const API_KEY = "c48c777c933744a8a07e31491abffec3";
 const SYMBOL = "EURUSD";
 const INTERVAL = "1min";
 
 let candles = [];
-let lastSignal = "WAIT";
+
+function showError(msg){
+  const box = document.getElementById("signalBox");
+  box.className = "signal wait";
+  box.innerText = "🟡 " + msg;
+}
 
 async function fetchCandles(){
   const statusEl = document.getElementById("apiStatus");
+  statusEl.innerText = "Fetching...";
 
   if(API_KEY === "YOUR_API_KEY_HERE" || API_KEY.length < 10){
     showError("API KEY ADD PANNA DA");
@@ -64,64 +68,53 @@ async function fetchCandles(){
   }
 
   try{
-    const url = "https://api.twelvedata.com/time_series?symbol=" +
-      encodeURIComponent(SYMBOL) +
-      "&interval=" + INTERVAL +
-      "&outputsize=60&apikey=" + API_KEY;
+    const url = https://api.twelvedata.com/time_series?symbol=${SYMBOL}&interval=${INTERVAL}&outputsize=60&apikey=${API_KEY};
 
-    const res = await fetch(url);
+    const controller = new AbortController();
+    setTimeout(()=>controller.abort(), 8000);
+
+    const res = await fetch(url,{signal:controller.signal});
     const data = await res.json();
 
-    console.log("TwelveData Response:", data);
+    console.log("API RESPONSE:", data);
 
-    if(data.status === "error" || !data.values){
-      let msg = data.message ? data.message : "No candle data";
+    if(!data.values){
+      const msg = data.message || "No data from API";
       showError("API ERROR: " + msg);
       statusEl.innerText = msg;
       return;
     }
 
-    candles = data.values.reverse().map(v => ({
-      time: v.datetime,
-      open: Number(v.open),
-      high: Number(v.high),
-      low: Number(v.low),
-      close: Number(v.close)
+    candles = data.values.reverse().map(v=>({
+      time:v.datetime,
+      open:Number(v.open),
+      high:Number(v.high),
+      low:Number(v.low),
+      close:Number(v.close)
     }));
 
     statusEl.innerText = "Connected";
     analyzeAndDraw();
 
-  }catch(err){
-    console.error(err);
-    showError("NETWORK ERROR / API BLOCK");
-    statusEl.innerText = "Network error";
+  }catch(e){
+    console.error(e);
+    showError("API FETCH FAILED / TIMEOUT");
+    statusEl.innerText = "Fetch failed";
   }
-}
-
-function showError(msg){
-  const box = document.getElementById("signalBox");
-  box.className = "signal wait";
-  box.innerText = "🟡 " + msg;
 }
 
 function ema(arr,len){
-  let k = 2 / (len + 1);
-  let e = arr[0];
-  for(let i=1;i<arr.length;i++){
-    e = arr[i] * k + e * (1 - k);
-  }
+  let k=2/(len+1), e=arr[0];
+  for(let i=1;i<arr.length;i++) e=arr[i]*k+e*(1-k);
   return e;
 }
 
-function rsi(closes,len){
-  let gain = 0;
-  let loss = 0;
-  for(let i = closes.length - len; i < closes.length; i++){
-    let d = closes[i] - closes[i-1];
-    if(d > 0) gain += d;
-    else loss -= d;
+function rsi(closes,len=14){
+  let gain=0,loss=0;
+  for(let i=closes.length-len;i<closes.length;i++){
+    let d=closes[i]-closes[i-1];
+    if(d>0) gain+=d; else loss-=d;
   }
-  if(loss === 0) return 100;
-  return 100 - (100 / (1 + gain / loss));
+  if(loss===0) return 100;
+  return 100-(100/(1+gain/loss));
 }
