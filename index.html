@@ -4,7 +4,107 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Binance Real Scanner Dashboard FINAL</title>
-<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+document.getElementById("signal").textContent = signal;
+  document.getElementById("signal").className = "bigSignal " + cls;
+  document.getElementById("conf").textContent = conf + "%";
+  document.getElementById("trend").textContent = bullishTrend ? "BULLISH" : bearishTrend ? "BEARISH" : "SIDEWAYS";
+  document.getElementById("trend").className = "val " + (bullishTrend?"good":bearishTrend?"bad":"warn");
+  document.getElementById("entry").textContent = signal==="WAIT" ? "--" : fmt(entry);
+  document.getElementById("sl").textContent = slv ? fmt(slv) : "--";
+  document.getElementById("tp1").textContent = tp1v ? fmt(tp1v) : "--";
+  document.getElementById("tp2").textContent = tp2v ? fmt(tp2v) : "--";
+  document.getElementById("buyers").textContent = buyers + "%";
+  document.getElementById("sellers").textContent = sellers + "%";
+  document.getElementById("buyerBar").style.width = buyers + "%";
+
+  if(signal !== "WAIT" && signal !== lastSignalText){
+    lastSignalText = signal;
+    let time = new Date().toLocaleTimeString();
+    let html = <div class="row"><b>${time}</b> — ${signal}<br>Entry ${fmt(entry)} | SL ${fmt(slv)} | TP1 ${fmt(tp1v)}<br>${reason} | Confidence ${conf}%</div>;
+    document.getElementById("history").innerHTML = html + document.getElementById("history").innerHTML;
+  }
+}
+
+async function loadHistory(){
+  const symbol = document.getElementById("symbol").value.toUpperCase();
+  const interval = document.getElementById("interval").value;
+  const url = https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=200;
+  const res = await fetch(url);
+  const data = await res.json();
+  candles = data.map(k=>({
+    time: Math.floor(k[0]/1000),
+    open: Number(k[1]),
+    high: Number(k[2]),
+    low: Number(k[3]),
+    close: Number(k[4]),
+    volume: Number(k[5])
+  }));
+  candleSeries.setData(candles);
+  analyze();
+}
+
+function connectWS(){
+  const symbol = document.getElementById("symbol").value;
+  const interval = document.getElementById("interval").value;
+  if(ws) ws.close();
+
+  ws = new WebSocket(wss://stream.binance.com:9443/ws/${symbol}@kline_${interval});
+
+  ws.onopen = () => document.getElementById("status").textContent = "● REAL BINANCE CONNECTED";
+  ws.onclose = () => document.getElementById("status").textContent = "● DISCONNECTED - RELOAD";
+  ws.onerror = () => document.getElementById("status").textContent = "● CONNECTION ERROR";
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const k = msg.k;
+    const candle = {
+      time: Math.floor(k.t/1000),
+      open: Number(k.o),
+      high: Number(k.h),
+      low: Number(k.l),
+      close: Number(k.c),
+      volume: Number(k.v)
+    };
+
+    candleSeries.update(candle);
+
+    let i = candles.findIndex(c=>c.time === candle.time);
+    if(i >= 0) candles[i] = candle; else candles.push(candle);
+    if(candles.length > 220) candles.shift();
+
+    analyze();
+  };
+}
+
+function initChart(){
+  chart = LightweightCharts.createChart(document.getElementById("chart"), {
+    layout:{background:{color:"#0b1226"},textColor:"#d1d5db"},
+    grid:{vertLines:{color:"#182235"},horzLines:{color:"#182235"}},
+    rightPriceScale:{borderColor:"#243047"},
+    timeScale:{borderColor:"#243047",timeVisible:true,secondsVisible:false}
+  });
+  candleSeries = chart.addCandlestickSeries({
+    upColor:"#00ff88",downColor:"#ff4b4b",
+    borderUpColor:"#00ff88",borderDownColor:"#ff4b4b",
+    wickUpColor:"#00ff88",wickDownColor:"#ff4b4b"
+  });
+}
+
+async function restart(){
+  document.getElementById("history").innerHTML = "";
+  lastSignalText = "";
+  await loadHistory();
+  connectWS();
+}
+
+document.getElementById("symbol").addEventListener("change", restart);
+document.getElementById("interval").addEventListener("change", restart);
+
+initChart();
+restart();
+</script>
+</body>
+</html>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#050816;color:#fff;font-family:Arial,Helvetica,sans-serif}
