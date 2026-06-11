@@ -291,7 +291,7 @@ function analyze(){
   if(signal !== "WAIT" && signal !== lastSignalText){
     lastSignalText = signal;
     let time = new Date().toLocaleTimeString();
-    let html = <div class="row"><b>${time}</b> — ${signal}<br>Entry ${fmt(entry)} | SL ${fmt(slv)} | TP1 ${fmt(tp1v)}<br>${reason} | Confidence ${conf}%</div>;
+    <div class="row"><b>${time}</b> — ${signal}<br>Entry ${fmt(entry)} | SL ${fmt(slv)} | TP1 ${fmt(tp1v)}<br>${reason} | Confidence ${conf}%</div>
     document.getElementById("history").innerHTML = html + document.getElementById("history").innerHTML;
   }
 }
