@@ -175,22 +175,7 @@ function analyze(){
     cls = "buy";
     conf = Math.min(92, 60 + Math.round(candleStrength*20) + (buyers-50) + (r>55?8:0));
     slv = entry - a*1.4;
-    tp1v = entry + a*2.0;
-    tp2v = entry + a*3.5;
-    reason = pullbackBuy ? "Trend pullback buy" : "Breakout buy";
-  } else if((pullbackSell || breakDown) && candleStrength > .35){
-    signal = "SELL / SHORT";
-    cls = "sell";
-    conf = Math.min(92, 60 + Math.round(candleStrength*20) + (sellers-50) + (r<45?8:0));
-    slv = entry + a*1.4;
-    tp1v = entry - a*2.0;
-    tp2v = entry - a*3.5;
-    reason = pullbackSell ? "Trend pullback sell" : "Breakdown sell";
-  } else {
-    slv = tp1v = tp2v = null;
-  }
-
-  document.getElementById("price").textContent = fmt(last.close);document.getElementById("signal").textContent = signal;
+    tp1v = entry + a*2.0;document.getElementById("signal").textContent = signal;
   document.getElementById("signal").className = "bigSignal " + cls;
   document.getElementById("conf").textContent = conf + "%";
   document.getElementById("trend").textContent = bullishTrend ? "BULLISH" : bearishTrend ? "BEARISH" : "SIDEWAYS";
@@ -291,4 +276,19 @@ restart();
 </script>
 </body>
 </html>
+    tp2v = entry + a*3.5;
+    reason = pullbackBuy ? "Trend pullback buy" : "Breakout buy";
+  } else if((pullbackSell || breakDown) && candleStrength > .35){
+    signal = "SELL / SHORT";
+    cls = "sell";
+    conf = Math.min(92, 60 + Math.round(candleStrength*20) + (sellers-50) + (r<45?8:0));
+    slv = entry + a*1.4;
+    tp1v = entry - a*2.0;
+    tp2v = entry - a*3.5;
+    reason = pullbackSell ? "Trend pullback sell" : "Breakdown sell";
+  } else {
+    slv = tp1v = tp2v = null;
+  }
+
+  document.getElementById("price").textContent = fmt(last.close);
   
