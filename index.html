@@ -1,358 +1,224 @@
-import { useState, useEffect, useCallback } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAHMAN OTC BEAST SCANNER</title>
+<style>
+body{margin:0;background:#05070f;color:#e8ecff;font-family:Arial,sans-serif}
+.container{max-width:1100px;margin:auto;padding:15px}
+.header{background:#0b0f1e;border:1px solid #1a2040;border-radius:15px;padding:18px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center}
+h1{font-size:20px;margin:0;color:#00ff88}
+.sub{font-size:12px;color:#7d86b0;margin-top:4px}
+.badge{background:#002b1a;color:#00ff88;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:bold}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{background:#0f1428;border:1px solid #1a2040;border-radius:15px;padding:15px}
+.pair{font-size:20px;font-weight:bold}
+.price{font-size:22px;margin-top:8px;font-family:monospace}
+.signal{margin-top:12px;padding:12px;border-radius:12px;font-size:22px;font-weight:bold;text-align:center}
+.call{background:rgba(0,255,136,.12);color:#00ff88;border:1px solid #00ff88}
+.put{background:rgba(255,45,92,.12);color:#ff2d5c;border:1px solid #ff2d5c}
+.wait{background:rgba(255,255,255,.08);color:#ffd166;border:1px solid #ffd166}
+.ind{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
+.ind div{background:#080c18;border:1px solid #1a2040;border-radius:8px;padding:7px;font-size:11px;text-align:center}
+.timer{font-size:38px;font-weight:bold;color:#ffd166;text-align:center;margin:15px 0;font-family:monospace}
+button{background:#4a7dff;color:white;border:0;border-radius:10px;padding:11px 18px;font-weight:bold}
+.note{font-size:12px;color:#8b95c9;margin-top:14px;line-height:1.5}
+.status{font-size:12px;color:#7d86b0;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>⚡ RAHMAN OTC BEAST SCANNER</h1>
+      <div class="sub">OTC Style Next Candle Signal • M1 • 15s Before Close</div>
+    </div>
+    <div class="badge">LIVE SCANNER</div>
+  </div>
 
-const API_KEY = "c48c777c933744a8a07e31491abffec3";
+  <div class="timer" id="timer">--</div>
+  <button onclick="scanNow()">SCAN NOW</button>
+  <div class="status" id="status">Waiting...</div>
+
+  <div class="grid" id="cards"></div>
+
+  <div class="note">
+    ⚠️ Note: Quotex OTC exact broker data API இல்லை. இது Twelve Data real forex feed வைத்து OTC-style signal தரும். Demo-வில் test பண்ணிட்டு தான் real trade போ.
+  </div>
+</div>
+
+<script>
+const API_KEY = "f2eb74a168e84757b3bbbc8851569d6b";
 
 const PAIRS = [
-  { symbol: "EUR/USD", td: "EUR/USD" },
-  { symbol: "GBP/USD", td: "GBP/USD" },
-  { symbol: "USD/JPY", td: "USD/JPY" },
-  { symbol: "AUD/USD", td: "AUD/USD" },
-  { symbol: "USD/CAD", td: "USD/CAD" },
-  { symbol: "EUR/GBP", td: "EUR/GBP" },
-  { symbol: "GBP/JPY", td: "GBP/JPY" },
-  { symbol: "NZD/USD", td: "NZD/USD" },
+  { name:"EUR/USD OTC", symbol:"EUR/USD" },
+  { name:"GBP/USD OTC", symbol:"GBP/USD" },
+  { name:"USD/JPY OTC", symbol:"USD/JPY" },
+  { name:"AUD/USD OTC", symbol:"AUD/USD" },
+  { name:"USD/CHF OTC", symbol:"USD/CHF" }
 ];
 
-function calcEMA(values, period) {
-  if (values.length < period) return values[values.length - 1];
-  const k = 2 / (period + 1);
-  let ema = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  for (let i = period; i < values.length; i++) ema = values[i] * k + ema * (1 - k);
-  return ema;
+let lastSignalMinute = -1;
+
+function ema(values, period){
+  if(values.length < period) return values[values.length-1];
+  let k = 2 / (period + 1);
+  let e = values.slice(0,period).reduce((a,b)=>a+b,0) / period;
+  for(let i=period;i<values.length;i++) e = values[i]*k + e*(1-k);
+  return e;
 }
 
-function calcRSI(closes, period = 7) {
-  if (closes.length < period + 1) return 50;
-  let gains = 0, losses = 0;
-  for (let i = closes.length - period; i < closes.length; i++) {
-    const d = closes[i] - closes[i - 1];
-    if (d > 0) gains += d; else losses -= d;
+function rsi(closes, period=14){
+  let gains=0, losses=0;
+  for(let i=closes.length-period;i<closes.length;i++){
+    let d = closes[i] - closes[i-1];
+    if(d > 0) gains += d;
+    else losses -= d;
   }
-  return 100 - 100 / (1 + gains / (losses || 0.0001));
+  let rs = gains / (losses || 0.00001);
+  return 100 - (100 / (1 + rs));
 }
 
-function calcMACD(closes) {
-  if (closes.length < 17) return { bull: false };
-  const ema8 = calcEMA(closes, 8);
-  const ema17 = calcEMA(closes, 17);
-  return { bull: ema8 > ema17 };
+function bollinger(closes){
+  let p = closes.slice(-20);
+  let mid = p.reduce((a,b)=>a+b,0)/p.length;
+  let variance = p.reduce((a,b)=>a+Math.pow(b-mid,2),0)/p.length;
+  let sd = Math.sqrt(variance);
+  return { upper: mid + 2*sd, mid, lower: mid - 2*sd };
 }
 
-function calcBB(closes, period = 20) {
-  const slice = closes.slice(-Math.min(period, closes.length));
-  const mid = slice.reduce((a, b) => a + b, 0) / slice.length;
-  return { aboveMid: closes[closes.length - 1] > mid };
+function stochastic(candles){
+  let p = candles.slice(-14);
+  let high = Math.max(...p.map(c=>c.high));
+  let low = Math.min(...p.map(c=>c.low));
+  let close = candles[candles.length-1].close;
+  return ((close-low)/(high-low || 0.00001))*100;
 }
 
-function analyzeNextCandle(candles) {
-  if (!candles || candles.length < 10) return null;
-  const closes = candles.map(c => c.close);
-  const ema5 = calcEMA(closes, 5);
-  const ema13 = calcEMA(closes, Math.min(13, closes.length - 1));
-  const rsi = calcRSI(closes, 7);
-  const { bull: macdBull } = calcMACD(closes);
-  const { aboveMid } = calcBB(closes);
-  const last3 = candles.slice(-3);
-  const bullCandles = last3.filter(c => c.close > c.open).length;
+function adxSideways(candles){
+  let recent = candles.slice(-10);
+  let range = recent.reduce((a,c)=>a+(c.high-c.low),0)/recent.length;
+  let price = recent[recent.length-1].close;
+  return range / price < 0.00035;
+}
+  function macdBull(closes){
+  return ema(closes,12) > ema(closes,26);
+}
 
-  const emaBull = ema5 > ema13;
-  const rsiBull = rsi > 50 && rsi < 78;
-  const rsiBear = rsi < 50 && rsi > 22;
-  const candleBull = bullCandles >= 2;
-  const candleBear = bullCandles <= 1;
+function analyze(candles){
+  let closes = candles.map(c=>c.close);
+  let last = candles[candles.length-1];
 
-  const bullScore = (emaBull?1:0) + (rsiBull?1:0) + (macdBull?1:0) + (candleBull?1:0) + (aboveMid?1:0);
-  const bearScore = (!emaBull?1:0) + (rsiBear?1:0) + (!macdBull?1:0) + (candleBear?1:0) + (!aboveMid?1:0);
+  let ema9 = ema(closes,9);
+  let ema21 = ema(closes,21);
+  let ema50 = ema(closes,50);
+  let rr = rsi(closes);
+  let bb = bollinger(closes);
+  let st = stochastic(candles);
+  let macd = macdBull(closes);
+  let sideways = adxSideways(candles);
 
-  const direction = bullScore >= bearScore ? "UP" : "DOWN";
-  const score = Math.max(bullScore, bearScore);
-  const signal = score >= 4 ? "STRONG" : score === 3 ? "MEDIUM" : "WAIT";
+  let call = 0, put = 0;
 
-  const cur = candles[candles.length - 1];
-  const prev = candles[candles.length - 2];
+  if(ema9 > ema21 && ema21 > ema50) call += 2;
+  if(ema9 < ema21 && ema21 < ema50) put += 2;
+
+  if(rr > 52 && rr < 70) call++;
+  if(rr < 48 && rr > 30) put++;
+
+  if(macd) call++; else put++;
+
+  if(last.close > bb.mid) call++;
+  if(last.close < bb.mid) put++;
+
+  if(st > 55 && st < 85) call++;
+  if(st < 45 && st > 15) put++;
+
+  if(last.close > last.open) call++;
+  if(last.close < last.open) put++;
+
+  let signal = "WAIT";
+  if(!sideways){
+    if(call >= 5 && call > put) signal = "CALL";
+    else if(put >= 5 && put > call) signal = "PUT";
+  }
 
   return {
-    price: cur.close,
-    change: +(cur.close - prev.close).toFixed(5),
-    rsi: +rsi.toFixed(1),
-    ema: emaBull ? "▲" : "▼",
-    macd: macdBull ? "▲" : "▼",
-    bb: aboveMid ? "▲" : "▼",
-    candle: candleBull ? "▲" : "▼",
-    bullScore, bearScore, score, direction, signal,
-    lastCandle: cur.dt,
+    signal,
+    price:last.close,
+    rsi:rr.toFixed(1),
+    stoch:st.toFixed(1),
+    ema: ema9 > ema21 ? "UP" : "DOWN",
+    macd: macd ? "UP" : "DOWN",
+    bb: last.close > bb.mid ? "UP" : "DOWN",
+    score: signal==="CALL" ? call : signal==="PUT" ? put : Math.max(call,put),
+    sideways
   };
 }
 
-function SignalBadge({ signal, direction }) {
-  if (signal === "STRONG" && direction === "UP")
-    return <div style={{background:"linear-gradient(135deg,#00c853,#00e676)",color:"#000",padding:"5px 12px",borderRadius:6,fontWeight:900,fontSize:13}}>▲ BUY</div>;
-  if (signal === "STRONG" && direction === "DOWN")
-    return <div style={{background:"linear-gradient(135deg,#d50000,#ff1744)",color:"#fff",padding:"5px 12px",borderRadius:6,fontWeight:900,fontSize:13}}>▼ SELL</div>;
-  if (signal === "MEDIUM")
-    return <div style={{background: direction==="UP"?"rgba(0,230,118,0.15)":"rgba(255,23,68,0.15)",color:direction==="UP"?"#00e676":"#ff1744",padding:"5px 12px",borderRadius:6,fontWeight:700,fontSize:12,border:1px solid ${direction==="UP"?"#00e67633":"#ff174433"}}}>{direction==="UP"?"↑ WEAK BUY":"↓ WEAK SELL"}</div>;
-  return <div style={{background:"rgba(255,255,255,0.06)",color:"#555",padding:"5px 12px",borderRadius:6,fontWeight:600,fontSize:12}}>— WAIT</div>;
-}
-  function ScoreDots({ score, dir }) {
-  return (
-    <div style={{display:"flex",gap:4}}>
-      {[1,2,3,4,5].map(i=>(
-        <div key={i} style={{width:9,height:9,borderRadius:"50%",background:i<=score?(dir==="UP"?"#00e676":"#ff1744"):"rgba(255,255,255,0.1)"}}/>
-      ))}
-    </div>
-  );
+async function fetchCandles(symbol){
+  let url = https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=1min&outputsize=60&apikey=${API_KEY};
+  let res = await fetch(url);
+  let json = await res.json();
+  if(!json.values) throw new Error(json.message || "No data");
+  return json.values.reverse().map(v=>({
+    open:parseFloat(v.open),
+    high:parseFloat(v.high),
+    low:parseFloat(v.low),
+    close:parseFloat(v.close)
+  }));
 }
 
-function Countdown({ onTick }) {
-  const [sec, setSec] = useState(60);
-  useEffect(() => {
-    setSec(60 - new Date().getSeconds());
-    const t = setInterval(() => {
-      const s = 60 - new Date().getSeconds();
-      setSec(s === 0 ? 60 : s);
-      if (s <= 1) onTick();
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
-  const col = sec <= 10 ? "#ff1744" : sec <= 20 ? "#ffd600" : "#00e676";
-  const pct = sec / 60;
-  const r = 20, circ = 2 * Math.PI * r;
-  return (
-    <div style={{display:"flex",alignItems:"center",gap:10}}>
-      <div style={{position:"relative",width:52,height:52}}>
-        <svg width="52" height="52" style={{transform:"rotate(-90deg)"}}>
-          <circle cx="26" cy="26" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4"/>
-          <circle cx="26" cy="26" r={r} fill="none" stroke={col} strokeWidth="4"
-            strokeDasharray={circ} strokeDashoffset={circ*(1-pct)}
-            style={{transition:"stroke-dashoffset 0.8s linear,stroke 0.3s"}}/>
-        </svg>
-        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,color:col}}>{sec}</div>
-      </div>
-      <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>Next candle<br/><b style={{color:col}}>{sec}s</b></div>
-    </div>
-  );
-}
+async function scanNow(){
+  document.getElementById("status").innerText = "Scanning market...";
+  let html = "";
 
-export default function App() {
-  const [data, setData] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState("");
-  const [filter, setFilter] = useState("ALL");
-  const [history, setHistory] = useState([]);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [fetchedCount, setFetchedCount] = useState(0);
+  for(let p of PAIRS){
+    try{
+      let candles = await fetchCandles(p.symbol);
+      let a = analyze(candles);
+      let cls = a.signal==="CALL" ? "call" : a.signal==="PUT" ? "put" : "wait";
+      let icon = a.signal==="CALL" ? "🟢 CALL" : a.signal==="PUT" ? "🔴 PUT" : "⚪ WAIT";
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    setFetchedCount(0);
-    const results = {};
-
-    for (let i = 0; i < PAIRS.length; i++) {
-      const { symbol, td } = PAIRS[i];
-      setStatus(Fetching ${symbol}... (${i+1}/${PAIRS.length}));
-      try {
-        const url = https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(td)}&interval=1min&outputsize=25&apikey=${API_KEY}&format=JSON;
-        const res = await fetch(url);
-        const json = await res.json();
-
-        if (json.values && json.values.length > 5) {
-          const candles = json.values.map(v => ({
-            open: parseFloat(v.open),
-            high: parseFloat(v.high),
-            low: parseFloat(v.low),
-            close: parseFloat(v.close),
-            dt: v.datetime,
-          })).reverse();
-
-          const analysis = analyzeNextCandle(candles);
-          if (analysis) {
-            results[symbol] = analysis;
-            setFetchedCount(c => c + 1);
-          }
-        }
-      } catch (e) {
-        console.error(Failed ${symbol}:, e);
-      }
-      // Rate limit: wait 800ms between requests
-      if (i < PAIRS.length - 1) await new Promise(r => setTimeout(r, 800));
+      html += 
+      <div class="card">
+        <div class="pair">${p.name}</div>
+        <div class="price">${a.price}</div>
+        <div class="signal ${cls}">${icon}</div>
+        <div class="ind">
+          <div>EMA<br>${a.ema}</div>
+          <div>RSI<br>${a.rsi}</div>
+          <div>MACD<br>${a.macd}</div>
+          <div>BB<br>${a.bb}</div>
+          <div>STOCH<br>${a.stoch}</div>
+          <div>SCORE<br>${a.score}/6</div>
+        </div>
+        <div class="status">${a.sideways ? "Sideways market: WAIT filter active" : "Trend market active"}</div>
+      </div>;
+    }catch(e){
+      html += <div class="card"><div class="pair">${p.name}</div><div class="signal wait">DATA ERROR</div></div>;
     }
+    await new Promise(r=>setTimeout(r,900));
+  }
 
-    setData(results);
-    setLastUpdate(new Date());
-    setLoading(false);
-    setStatus("");
-
-    const strong = Object.entries(results)
-      .filter(([, d]) => d.signal === "STRONG")
-      .map(([pair, d]) => ({
-        pair, direction: d.direction, score: d.score,
-        time: new Date().toLocaleTimeString(), price: d.price
-      }));
-    if (strong.length > 0)
-      setHistory(h => [...strong, ...h].slice(0, 15));
-  }, []);
-
-  useEffect(() => { fetchAll(); }, []);
-
-  const allPairs = Object.entries(data);
-  const filtered = allPairs.filter(([, d]) => {
-    if (filter === "ALL") return true;
-     if (filter === "STRONG") return d.signal === "STRONG";
-    if (filter === "BUY") return d.signal === "STRONG" && d.direction === "UP";
-    if (filter === "SELL") return d.signal === "STRONG" && d.direction === "DOWN";
-    return true;
-  });
-  const strongCount = allPairs.filter(([, d]) => d.signal === "STRONG").length;
-
-  return (
-    <div style={{minHeight:"100vh",background:"#080c18",fontFamily:"'Inter','Segoe UI',sans-serif",color:"#e2e6f0",paddingBottom:48}}>
-
-      {/* HEADER */}
-      <div style={{background:"rgba(10,14,28,0.98)",borderBottom:"1px solid rgba(255,255,255,0.06)",padding:"14px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12,position:"sticky",top:0,zIndex:100}}>
-        <div>
-          <div style={{fontSize:21,fontWeight:900,letterSpacing:2}}>
-            <span style={{color:"#00e676"}}>QX</span> SCANNER
-            <span style={{fontSize:10,background:"#00e676",color:"#000",borderRadius:4,padding:"2px 6px",marginLeft:8,fontWeight:800,verticalAlign:"middle"}}>LIVE</span>
-          </div>
-          <div style={{fontSize:11,color:"#333",marginTop:2}}>Real Market • Next Candle • 1 Min</div>
-        </div>
-        <Countdown onTick={fetchAll}/>
-        <div style={{display:"flex",gap:18}}>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:22,fontWeight:900,color:"#00e676"}}>{strongCount}</div>
-            <div style={{fontSize:10,color:"#333"}}>SIGNALS</div>
-          </div>
-          <div style={{textAlign:"center"}}>
-            <div style={{fontSize:22,fontWeight:900,color:"#64b5f6"}}>{Object.keys(data).length}</div>
-            <div style={{fontSize:10,color:"#333"}}>PAIRS</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{padding:"14px"}}>
-
-        {/* LOADING BAR */}
-        {loading && (
-          <div style={{marginBottom:16}}>
-            <div style={{background:"rgba(0,230,118,0.08)",border:"1px solid rgba(0,230,118,0.2)",borderRadius:10,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:20,animation:"spin 1s linear infinite"}}>⏳</div>
-              <div>
-                <div style={{color:"#00e676",fontWeight:700,fontSize:13}}>{status || "Connecting to real market..."}</div>
-                <div style={{background:"rgba(255,255,255,0.05)",borderRadius:4,height:4,marginTop:6,overflow:"hidden"}}>
-                  <div style={{background:"#00e676",height:"100%",width:${(fetchedCount/PAIRS.length)*100}%,transition:"width 0.5s",borderRadius:4}}/>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* FILTERS */}
-        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-          {["ALL","STRONG","BUY","SELL"].map(f=>(
-            <button key={f} onClick={()=>setFilter(f)} style={{padding:"7px 18px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:800,background:filter===f?(f==="BUY"?"#00e676":f==="SELL"?"#ff1744":"#3d5afe"):"rgba(255,255,255,0.07)",color:filter===f?(f==="BUY"?"#000":"#fff"):"#777",transition:"all 0.2s"}}>{f}</button>
-          ))}
-          <button onClick={fetchAll} disabled={loading} style={{padding:"7px 16px",borderRadius:20,border:"1px solid rgba(255,255,255,0.1)",cursor:"pointer",fontSize:12,fontWeight:700,background:"transparent",color:loading?"#333":"#888",marginLeft:"auto"}}>
-            {loading?"⏳ Loading...":"🔄 Refresh"}
-          </button>
-        </div>
-        {lastUpdate && <div style={{fontSize:11,color:"#333",marginBottom:12}}>Last updated: {lastUpdate.toLocaleTimeString()}</div>}
-
-        {/* STRONG BANNER */}
-        {!loading && strongCount > 0 && (
-          <div style={{background:"linear-gradient(135deg,rgba(0,230,118,0.08),rgba(61,90,254,0.08))",border:"1px solid rgba(0,230,118,0.18)",borderRadius:12,padding:"12px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
-            <div style={{fontSize:22}}>🔥</div>
-            <div>
-              <div style={{fontWeight:900,fontSize:14,color:"#00e676",marginBottom:4}}>{strongCount} STRONG NEXT-CANDLE SIGNAL{strongCount>1?"S":""}!</div>
-              <div style={{fontSize:11,lineHeight:1.9}}>
-                {Object.entries(data).filter(([,d])=>d.signal==="STRONG").map(([p,d])=>(
-                  <span key={p} style={{marginRight:10,color:d.direction==="UP"?"#00e676":"#ff1744",fontWeight:800}}>{p} {d.direction==="UP"?"▲":"▼"}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* NO DATA */}
-        {!loading && Object.keys(data).length === 0 && (
-          <div style={{textAlign:"center",padding:"40px 0",color:"#444"}}>
-            <div style={{fontSize:32,marginBottom:12}}>📡</div>
-            <div style={{fontWeight:700}}>No data yet. Click Refresh!</div>
-          </div>
-        )}
-
-        {/* PAIR GRID */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:10}}>
-          {filtered.map(([pair, d]) => {
-            const isStrong = d.signal === "STRONG";
-            const isUp = d.direction === "UP";
-            return (
-              <div key={pair} style={{background:isStrong?(isUp?"linear-gradient(145deg,rgba(0,200,83,0.1),rgba(8,12,24,0.97))":"linear-gradient(145deg,rgba(213,0,0,0.1),rgba(8,12,24,0.97))"):"rgba(255,255,255,0.03)",border:1px solid ${isStrong?(isUp?"rgba(0,230,118,0.25)":"rgba(255,23,68,0.25)"):"rgba(255,255,255,0.06)"},borderRadius:12,padding:"14px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                  <div>
-                    <div style={{fontWeight:900,fontSize:16}}>{pair}</div>
-                    <div style={{fontSize:12,color:"#444",marginTop:3}}>
-                      <span style={{color:"#bbb",fontWeight:700}}>{d.price.toFixed(5)}</span>
-                      <span style={{marginLeft:8,color:d.change>=0?"#00e676":"#ff1744",fontSize:11}}>{d.change>=0?"+":""}{d.change.toFixed(5)}</span>
-                    </div>
-                  </div>
-                  <SignalBadge signal={d.signal} direction={d.direction}/>
-                </div>
-
-                {isStrong && (
-                  <div style={{background:isUp?"rgba(0,230,118,0.07)":"rgba(255,23,68,0.07)",border:1px solid ${isUp?"rgba(0,230,118,0.15)":"rgba(255,23,68,0.15)"},borderRadius:8,padding:"8px 12px",marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
-                    <div style={{fontSize:18}}>{isUp?"🟢":"🔴"}</div>
-                    <div>
-                      <div style={{fontSize:12,fontWeight:900,color:isUp?"#00e676":"#ff1744"}}>NEXT CANDLE → {isUp?"UP ▲":"DOWN ▼"}</div>
-                      <div style={{fontSize:10,color:"#444"}}>{d.score}/5 real indicators confirm</div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
-                  {[
-                    {label:"EMA",val:d.ema,bull:d.ema==="▲"},
-                    {label:"RSI",val:d.rsi,bull:d.rsi>50},
-                    {label:"MACD",val:d.macd,bull:d.macd==="▲"},
-                    {label:"BB",val:d.bb,bull:d.bb==="▲"},
-                    {label:"CNDL",val:d.candle,bull:d.candle==="▲"},
-                  ].map(ind=>(
-                    <div key={ind.label} style={{background:"rgba(255,255,255,0.04)",borderRadius:6,padding:"3px 8px",fontSize:11,display:"flex",gap:4,alignItems:"center",border:"1px solid rgba(255,255,255,0.05)"}}>
-                      <span style={{color:"#333"}}>{ind.label}</span>
-                      <span style={{color:ind.bull?"#00e676":"#ff1744",fontWeight:800}}>{ind.val}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <ScoreDots score={d.score} dir={d.direction}/>
-                  <div style={{fontSize:11,color:"#333"}}>
-                    <b style={{color:d.score>=4?"#00e676":d.score===3?"#ffd600":"#555"}}>{d.score>=4?"HIGH CONFIDENCE":d.score===3?"MEDIUM":"LOW"}</b>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* HISTORY */}
-        {history.length > 0 && (
-          <div style={{marginTop:24}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#333",marginBottom:10,letterSpacing:2}}>SIGNAL HISTORY</div>
-            {history.map((h,i)=>(
-              <div key={i} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:8,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:12,marginBottom:5,flexWrap:"wrap",gap:6}}>
-                <span style={{color:"#333"}}>{h.time}</span>
-                <span style={{fontWeight:800}}>{h.pair}</span>
-                <span style={{color:h.direction==="UP"?"#00e676":"#ff1744",fontWeight:900}}>{h.direction==="UP"?"▲ BUY":"▼ SELL"}</span>
-                <span style={{color:"#333",fontSize:11}}>{h.price?.toFixed(5)}</span>
-                <span style={{color:"#333",fontSize:11}}>{h.score}/5</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={{marginTop:20,padding:"12px 16px",background:"rgba(255,214,0,0.04)",border:"1px solid rgba(255,214,0,0.1)",borderRadius:10,fontSize:11,color:"#555",lineHeight:1.8}}>
-          ⚠️ <b style={{color:"#ffd600"}}>Risk Warning:</b> Real market data via Twelve Data API. Only trade STRONG (4/5 or 5/5) signals. Max 2-3% per trade. 🙏
-        </div>
-      </div>
-    </div>
-  );
+  document.getElementById("cards").innerHTML = html;
+  document.getElementById("status").innerText = "Last scan: " + new Date().toLocaleTimeString();
 }
+
+setInterval(()=>{
+  let now = new Date();
+  let sec = now.getSeconds();
+  let remain = 60 - sec;
+  document.getElementById("timer").innerText = remain + "s";
+
+  if(remain <= 15 && lastSignalMinute !== now.getMinutes()){
+    lastSignalMinute = now.getMinutes();
+    scanNow();
+  }
+},1000);
+
+scanNow();
+</script>
+</body>
+</html>
